@@ -327,6 +327,11 @@
             
             <div class="control-group">
                 <label>&nbsp;</label>
+                <button id="centerIcon" disabled>Center Icon</button>
+            </div>
+            
+            <div class="control-group">
+                <label>&nbsp;</label>
                 <button id="downloadBtn" disabled>Download PNG</button>
             </div>
         </div>
@@ -364,6 +369,7 @@
         const iconGrid = document.getElementById('iconGrid');
         const showMoreBtn = document.getElementById('showMoreBtn');
         const iconColorInput = document.getElementById('iconColor');
+        const centerIconBtn = document.getElementById('centerIcon');
         
         let img = null;
         let imgX = 0;
@@ -503,10 +509,15 @@
             }
         }
         
-        // Apply color and load to canvas
-        function loadImageFromSVG(svgText) {
+        // Apply color and load to canvas (keeps existing scale and position if icon already loaded)
+        function loadImageFromSVG(svgText, keepPosition = false) {
             const blob = new Blob([svgText], { type: 'image/svg+xml' });
             const url = URL.createObjectURL(blob);
+            
+            // Store current position and scale if we want to keep them
+            const oldScale = keepPosition ? imgScale : null;
+            const oldX = keepPosition ? imgX : null;
+            const oldY = keepPosition ? imgY : null;
             
             img = new Image();
             img.onload = () => {
@@ -515,18 +526,26 @@
                     console.warn(`Icon loaded as non-square: ${img.width}x${img.height}. This may affect sizing.`);
                 }
                 
-                // Load at 70% of canvas size by default
-                const targetSize = Math.min(canvas.width, canvas.height) * 0.70;
-                const iconSize = Math.max(img.width, img.height);
-                const scaleForSize = targetSize / iconSize;
+                if (keepPosition && oldScale !== null) {
+                    // Keep existing scale and position (for color changes)
+                    imgScale = oldScale;
+                    imgX = oldX;
+                    imgY = oldY;
+                } else {
+                    // Load at 70% of canvas size by default
+                    const targetSize = Math.min(canvas.width, canvas.height) * 0.70;
+                    const iconSize = Math.max(img.width, img.height);
+                    const scaleForSize = targetSize / iconSize;
+                    
+                    imgScale = scaleForSize;
+                    imgX = (canvas.width - img.width * imgScale) / 2;
+                    imgY = (canvas.height - img.height * imgScale) / 2;
+                }
                 
-                imgScale = scaleForSize;
-                imageScaleInput.value = Math.round(scaleForSize * 100);
-                
-                imgX = (canvas.width - img.width * imgScale) / 2;
-                imgY = (canvas.height - img.height * imgScale) / 2;
+                imageScaleInput.value = Math.round(imgScale * 100);
                 draw();
                 downloadBtn.disabled = false;
+                centerIconBtn.disabled = false;
                 URL.revokeObjectURL(url);
             };
             img.src = url;
@@ -565,14 +584,23 @@
             // Debounce color change to 150ms
             colorChangeTimeout = setTimeout(() => {
                 if (isMonochromeIcon && currentSvgText) {
-                    // Reload icon with new color
+                    // Reload icon with new color, keeping position
                     const colorHex = currentIconColor.replace('#', '');
                     fetch(`https://api.iconify.design/${currentSvgText}.svg?box=1&color=%23${colorHex}`)
                         .then(response => response.text())
-                        .then(svgText => loadImageFromSVG(svgText))
+                        .then(svgText => loadImageFromSVG(svgText, true))
                         .catch(error => console.error('Error updating icon color:', error));
                 }
             }, 150);
+        });
+        
+        // Center icon button
+        centerIconBtn.addEventListener('click', () => {
+            if (img) {
+                imgX = (canvas.width - img.width * imgScale) / 2;
+                imgY = (canvas.height - img.height * imgScale) / 2;
+                draw();
+            }
         });
         
         // Preset buttons
@@ -592,22 +620,24 @@
                         const iconSize = Math.max(img.width, img.height);
                         imgScale = targetSize / iconSize;
                         imageScaleInput.value = Math.round(imgScale * 100);
+                        // Re-center icon
                         imgX = (canvas.width - img.width * imgScale) / 2;
                         imgY = (canvas.height - img.height * imgScale) / 2;
                         draw();
                     }
                 } else if (preset === 'notion-cover') {
-                    // Notion Cover: 3000x1200, icon square at 80% of height
+                    // Notion Cover: 3000x1200, icon square at 90% of height
                     canvasWidthInput.value = 3000;
                     canvasHeightInput.value = 1200;
                     canvas.width = 3000;
                     canvas.height = 1200;
                     
                     if (img) {
-                        const targetSize = 1200 * 0.90; // 90% of height
+                        const targetSize = 1200 * 0.90;
                         const iconSize = Math.max(img.width, img.height);
                         imgScale = targetSize / iconSize;
                         imageScaleInput.value = Math.round(imgScale * 100);
+                        // Re-center icon
                         imgX = (canvas.width - img.width * imgScale) / 2;
                         imgY = (canvas.height - img.height * imgScale) / 2;
                         draw();
@@ -624,6 +654,7 @@
                         const iconSize = Math.max(img.width, img.height);
                         imgScale = targetSize / iconSize;
                         imageScaleInput.value = Math.round(imgScale * 100);
+                        // Re-center icon
                         imgX = (canvas.width - img.width * imgScale) / 2;
                         imgY = (canvas.height - img.height * imgScale) / 2;
                         draw();
@@ -650,6 +681,7 @@
                         imgY = (canvas.height - img.height * imgScale) / 2;
                         draw();
                         downloadBtn.disabled = false;
+                        centerIconBtn.disabled = false;
                     };
                     img.src = event.target.result;
                 };
