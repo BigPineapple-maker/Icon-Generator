@@ -47,18 +47,30 @@
         .search-controls input {
             flex: 1;
             padding: 10px 15px;
-            border: 1px solid #ddd;
+            border: 2px solid #007bff;
             border-radius: 4px;
             font-size: 14px;
         }
 
+        .search-controls input:focus {
+            outline: none;
+            border-color: #0056b3;
+            box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+        }
+
         .search-controls select {
             padding: 10px 15px;
-            border: 1px solid #ddd;
+            border: 2px solid #007bff;
             border-radius: 4px;
             font-size: 14px;
             background: white;
             cursor: pointer;
+        }
+
+        .search-controls select:focus {
+            outline: none;
+            border-color: #0056b3;
+            box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
         }
 
         .icon-grid {
@@ -339,7 +351,9 @@
                     url = `https://api.iconify.design/search?query=${encodeURIComponent(query)}&limit=64`;
                     if (prefix) url += `&prefixes=${prefix}`;
                 } else if (prefix) {
-                    url = `https://api.iconify.design/search?query=&limit=64&prefixes=${prefix}`;
+                    // When category selected without search, show common icons from that set
+                    const commonTerms = ['home', 'user', 'search', 'menu', 'close', 'check', 'star', 'heart'];
+                    url = `https://api.iconify.design/search?query=${commonTerms.join(' ')}&limit=64&prefixes=${prefix}`;
                 } else {
                     // Default popular icons
                     displayDefaultIcons();
