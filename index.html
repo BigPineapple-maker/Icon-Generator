@@ -418,8 +418,9 @@
                     url = `https://api.iconify.design/search?query=${encodeURIComponent(query)}&limit=64`;
                     if (prefix) url += `&prefixes=${prefix}`;
                 } else if (prefix) {
-                    const commonTerms = ['home', 'user', 'account', 'search', 'menu', 'settings', 'arrow', 'check', 'close', 'star', 'heart', 'file', 'folder', 'edit', 'delete', 'share', 'save', 'upload', 'download', 'mail', 'email', 'phone', 'lock', 'calendar', 'clock', 'notification', 'bell', 'warning', 'alert', 'info', 'help', 'plus', 'minus', 'play', 'pause', 'stop'];
-                    url = `https://api.iconify.design/search?query=${commonTerms.join(' ')}&limit=64&prefixes=${prefix}`;
+                    // When category is selected but no search term, use a broad search
+                    // Using common terms separately to ensure we get results
+                    url = `https://api.iconify.design/search?query=home,user,arrow,check,menu,star&limit=64&prefixes=${prefix}`;
                 } else {
                     displayDefaultIcons();
                     return;
@@ -429,6 +430,16 @@
                 const data = await response.json();
                 
                 currentIcons = data.icons || [];
+                
+                // If we got no results with the category, try a fallback
+                if (currentIcons.length === 0 && prefix && !query) {
+                    // Fallback: try just searching for "icon" in that category
+                    url = `https://api.iconify.design/search?query=icon&limit=64&prefixes=${prefix}`;
+                    const fallbackResponse = await fetch(url);
+                    const fallbackData = await fallbackResponse.json();
+                    currentIcons = fallbackData.icons || [];
+                }
+                
                 displayedCount = 12;
                 displayIcons();
             } catch (error) {
