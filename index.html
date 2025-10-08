@@ -740,6 +740,7 @@
         
         // Mouse events
         canvas.addEventListener('mousedown', (e) => {
+            console.log('MOUSEDOWN EVENT FIRED');
             startDrag(e.clientX, e.clientY);
         });
         
@@ -748,6 +749,7 @@
         });
         
         canvas.addEventListener('mouseup', () => {
+            console.log('MOUSEUP EVENT FIRED');
             isDragging = false;
         });
         
