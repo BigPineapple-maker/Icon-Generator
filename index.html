@@ -199,7 +199,7 @@
         
         .canvas-container {
             display: inline-block;
-            border: 2px solid #ddd;
+            border: 3px solid #007bff;
             background: 
                 repeating-conic-gradient(#f0f0f0 0% 25%, white 0% 50%) 
                 50% / 20px 20px;
@@ -237,6 +237,29 @@
             margin: 5px 0;
             color: #555;
         }
+        
+        .preset-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .preset-btn {
+            padding: 12px 20px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+        
+        .preset-btn:hover {
+            background: #218838;
+        }
     </style>
 </head>
 <body>
@@ -258,6 +281,13 @@
             </div>
             <div id="iconGrid" class="icon-grid"></div>
             <button id="showMoreBtn" class="show-more-btn" style="display: none;">Show More</button>
+        </div>
+        
+        <h3 style="margin-bottom: 15px; color: #333;">Quick Presets</h3>
+        <div class="preset-buttons">
+            <button class="preset-btn" data-preset="ios">iOS Home Screen</button>
+            <button class="preset-btn" data-preset="notion-cover">Notion Cover</button>
+            <button class="preset-btn" data-preset="notion-icon">Notion Icon</button>
         </div>
         
         <div class="controls">
@@ -340,6 +370,8 @@
         let dragStartY = 0;
         let currentIconColor = '#000000';
         let isMonochromeIcon = true;
+        let currentSvgText = null;
+        let colorChangeTimeout = null;
         
         let currentIcons = [];
         let displayedCount = 12;
@@ -374,7 +406,7 @@
                     if (prefix) url += `&prefixes=${prefix}`;
                 } else if (prefix) {
                     // When category selected without search, show common icons from that set
-                    const commonTerms = ['home', 'user', 'account', 'search', 'menu', 'settings', 'arrow', 'check', 'close', 'star', 'heart', 'file', 'folder', 'edit', 'delete', 'share', 'save', 'upload', 'download', 'mail', 'phone', 'lock', 'calendar', 'clock', 'notification', 'bell', 'warning', 'alert', 'info', 'help'];
+                    const commonTerms = ['home', 'user', 'account', 'search', 'menu', 'settings', 'arrow', 'check', 'close', 'star', 'heart', 'file', 'folder', 'edit', 'delete', 'share', 'save', 'upload', 'download', 'mail', 'email', 'phone', 'lock', 'calendar', 'clock', 'notification', 'bell', 'warning', 'alert', 'info', 'help', 'plus', 'minus', 'play', 'pause', 'stop'];
                     url = `https://api.iconify.design/search?query=${commonTerms.join(' ')}&limit=64&prefixes=${prefix}`;
                 } else {
                     // Default popular icons
@@ -403,7 +435,8 @@
                 'mdi:image', 'mdi:video', 'mdi:music', 'mdi:file', 'mdi:folder', 'mdi:download',
                 'mdi:upload', 'mdi:share', 'mdi:edit', 'mdi:delete', 'mdi:save', 'mdi:plus',
                 'mdi:minus', 'mdi:play', 'mdi:pause', 'mdi:lock', 'mdi:unlock', 'mdi:bell',
-                'mdi:alert', 'mdi:information', 'mdi:help', 'mdi:tag', 'mdi:bookmark', 'mdi:link'
+                'mdi:alert', 'mdi:information', 'mdi:help', 'mdi:tag', 'mdi:bookmark', 'mdi:link',
+                'mdi:cloud', 'mdi:refresh', 'mdi:copy', 'mdi:cut', 'mdi:paste', 'mdi:undo'
             ];
             currentIcons = defaultIcons;
             displayedCount = 12;
@@ -443,44 +476,60 @@
                 const response = await fetch(`https://api.iconify.design/${iconName}.svg`);
                 let svgText = await response.text();
                 
+                // Store original SVG for color changes
+                currentSvgText = svgText;
+                
                 // Check if icon is monochrome by looking for currentColor or single fill/stroke
                 isMonochromeIcon = svgText.includes('currentColor') || 
                                    (svgText.match(/fill=/g) || []).length <= 2;
                 
-                // Apply color if monochrome
                 if (isMonochromeIcon) {
-                    svgText = svgText.replace(/currentColor/g, currentIconColor);
-                    svgText = svgText.replace(/fill="[^"]*"/g, `fill="${currentIconColor}"`);
-                    svgText = svgText.replace(/stroke="[^"]*"/g, `stroke="${currentIconColor}"`);
                     iconColorInput.disabled = false;
+                    iconColorInput.title = "";
                 } else {
                     iconColorInput.disabled = true;
                     iconColorInput.title = "Color change not available for multi-color icons";
                 }
                 
-                const blob = new Blob([svgText], { type: 'image/svg+xml' });
-                const url = URL.createObjectURL(blob);
-                
-                img = new Image();
-                img.onload = () => {
-                    // Load at 65% of canvas size
-                    const targetSize = Math.min(canvas.width, canvas.height) * 0.65;
-                    const iconSize = Math.max(img.width, img.height);
-                    const scaleForSize = targetSize / iconSize;
-                    
-                    imgScale = scaleForSize;
-                    imageScaleInput.value = Math.round(scaleForSize * 100);
-                    
-                    imgX = (canvas.width - img.width * imgScale) / 2;
-                    imgY = (canvas.height - img.height * imgScale) / 2;
-                    draw();
-                    downloadBtn.disabled = false;
-                    URL.revokeObjectURL(url);
-                };
-                img.src = url;
+                applyColorAndLoadImage(currentIconColor);
             } catch (error) {
                 alert('Error loading icon. Please try another one.');
             }
+        }
+        
+        // Apply color to SVG and load to canvas
+        function applyColorAndLoadImage(color) {
+            if (!currentSvgText) return;
+            
+            let svgText = currentSvgText;
+            
+            // Apply color if monochrome
+            if (isMonochromeIcon) {
+                svgText = svgText.replace(/currentColor/g, color);
+                svgText = svgText.replace(/fill="[^"]*"/g, `fill="${color}"`);
+                svgText = svgText.replace(/stroke="[^"]*"/g, `stroke="${color}"`);
+            }
+            
+            const blob = new Blob([svgText], { type: 'image/svg+xml' });
+            const url = URL.createObjectURL(blob);
+            
+            img = new Image();
+            img.onload = () => {
+                // Load at 70% of canvas size by default
+                const targetSize = Math.min(canvas.width, canvas.height) * 0.70;
+                const iconSize = Math.max(img.width, img.height);
+                const scaleForSize = targetSize / iconSize;
+                
+                imgScale = scaleForSize;
+                imageScaleInput.value = Math.round(scaleForSize * 100);
+                
+                imgX = (canvas.width - img.width * imgScale) / 2;
+                imgY = (canvas.height - img.height * imgScale) / 2;
+                draw();
+                downloadBtn.disabled = false;
+                URL.revokeObjectURL(url);
+            };
+            img.src = url;
         }
         
         // Event listeners for search
@@ -504,20 +553,89 @@
             displayIcons();
         });
         
-        // Color picker
+        // Color picker with debounce
         iconColorInput.addEventListener('input', (e) => {
             currentIconColor = e.target.value;
-            if (isMonochromeIcon && img) {
-                // Reload the current icon with new color
-                // We need to store the icon name to reload it
-                // For now, just inform user to reselect icon
+            
+            // Clear existing timeout
+            if (colorChangeTimeout) {
+                clearTimeout(colorChangeTimeout);
             }
+            
+            // Debounce color change to 150ms
+            colorChangeTimeout = setTimeout(() => {
+                if (isMonochromeIcon && currentSvgText) {
+                    applyColorAndLoadImage(currentIconColor);
+                }
+            }, 150);
+        });
+        
+        // Preset buttons
+        document.querySelectorAll('.preset-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const preset = e.target.dataset.preset;
+                
+                if (preset === 'ios') {
+                    // iOS Home Screen: 1024x1024, 70% fill
+                    canvasWidthInput.value = 1024;
+                    canvasHeightInput.value = 1024;
+                    canvas.width = 1024;
+                    canvas.height = 1024;
+                    
+                    if (img) {
+                        const targetSize = 1024 * 0.70;
+                        const iconSize = Math.max(img.width, img.height);
+                        imgScale = targetSize / iconSize;
+                        imageScaleInput.value = Math.round(imgScale * 100);
+                        imgX = (canvas.width - img.width * imgScale) / 2;
+                        imgY = (canvas.height - img.height * imgScale) / 2;
+                        draw();
+                    }
+                } else if (preset === 'notion-cover') {
+                    // Notion Cover: 3000x1200, icon square at 80% of height
+                    canvasWidthInput.value = 3000;
+                    canvasHeightInput.value = 1200;
+                    canvas.width = 3000;
+                    canvas.height = 1200;
+                    
+                    if (img) {
+                        const targetSize = 1200 * 0.90; // 90% of height
+                        const iconSize = Math.max(img.width, img.height);
+                        imgScale = targetSize / iconSize;
+                        imageScaleInput.value = Math.round(imgScale * 100);
+                        imgX = (canvas.width - img.width * imgScale) / 2;
+                        imgY = (canvas.height - img.height * imgScale) / 2;
+                        draw();
+                    }
+                } else if (preset === 'notion-icon') {
+                    // Notion Icon: 280x280, 80% fill
+                    canvasWidthInput.value = 280;
+                    canvasHeightInput.value = 280;
+                    canvas.width = 280;
+                    canvas.height = 280;
+                    
+                    if (img) {
+                        const targetSize = 280 * 0.80;
+                        const iconSize = Math.max(img.width, img.height);
+                        imgScale = targetSize / iconSize;
+                        imageScaleInput.value = Math.round(imgScale * 100);
+                        imgX = (canvas.width - img.width * imgScale) / 2;
+                        imgY = (canvas.height - img.height * imgScale) / 2;
+                        draw();
+                    }
+                }
+            });
         });
         
         // Load file upload
         fileInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (file) {
+                // Disable color picker for uploads
+                currentSvgText = null;
+                iconColorInput.disabled = true;
+                iconColorInput.title = "Color change only available for Iconify icons";
+                
                 const reader = new FileReader();
                 reader.onload = (event) => {
                     img = new Image();
